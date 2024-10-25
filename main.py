@@ -7,32 +7,15 @@ from xgboost import XGBRegressor
 from sklearn.tree import DecisionTreeRegressor
 from models import * 
 
-
-tickers= ['AAPL']
-ticker=tickers[0]
-
-X_filtered = pd.read_csv(f'./processed_data/{ticker}_X.csv', index_col=0)
-y = pd.read_csv(f'./processed_data/{ticker}_y.csv', index_col=0)
-
-# Define split sizes
-train_size = 0.7
-val_size = 0.15
-test_size = 0.15
-
-# Calculate indices for splits
-n = len(X_filtered)
-train_end = int(n * train_size)
-val_end = train_end + int(n * val_size)
-
 # Split the data
-X_train = X_filtered.iloc[:train_end]
-y_train = y.iloc[:train_end]
+X_train = pd.read_csv(f'./train_X.csv', index_col=0)
+y_train = pd.read_csv(f'./train_y.csv', index_col=0)
 
-X_val = X_filtered.iloc[train_end:val_end]
-y_val = y.iloc[train_end:val_end]
+X_val = pd.read_csv(f'./valid_X.csv', index_col=0)
+y_val = pd.read_csv(f'./valid_y.csv', index_col=0)
 
-X_test = X_filtered.iloc[val_end:]
-y_test = y.iloc[val_end:]
+X_test = pd.read_csv(f'./test_X.csv', index_col=0)
+y_test = pd.read_csv(f'./test_y.csv', index_col=0)
 
 
 
@@ -43,6 +26,7 @@ scaler_y = StandardScaler()
 # Fit scalers on training data
 X_train_scaled = pd.DataFrame(scaler_X.fit_transform(X_train), index=X_train.index, columns=X_train.columns)
 y_train_scaled = scaler_y.fit_transform(y_train.values.reshape(-1, 1)).flatten()
+
 
 # Transform validation and test data
 X_val_scaled = pd.DataFrame(scaler_X.transform(X_val), index=X_val.index, columns=X_val.columns)
@@ -193,7 +177,7 @@ for hidden_size in hidden_sizes:
                 model_lstm = LSTMModel(input_size, hidden_size=hidden_size, num_layers=num_layers)
                 
                 # Train model
-                model_lstm, val_mape = train_model(model_lstm, train_loader, val_loader, num_epochs=10, learning_rate=lr)
+                model_lstm, val_mape = train_model(model_lstm, train_loader, val_loader, num_epochs=1, learning_rate=lr)
                 
                 # Update best model if validation MAPE improves
                 if val_mape < best_mape_lstm:
@@ -250,7 +234,7 @@ for hidden_size in hidden_sizes:
                 model_gru = GRUModel(input_size, hidden_size=hidden_size, num_layers=num_layers)
                 
                 # Train model
-                model_gru, val_mape = train_model(model_gru, train_loader, val_loader, num_epochs=10, learning_rate=lr)
+                model_gru, val_mape = train_model(model_gru, train_loader, val_loader, num_epochs=1, learning_rate=lr)
                 
                 # Update best model if validation MAPE improves
                 if val_mape < best_mape_gru:
@@ -292,7 +276,7 @@ print(f'GRU Test MAPE: {test_mape_gru:.4f}')
 
 
 
-
+to_save = ""
 print("\nModel Performance Comparison:")
 print(f"Linear Regression Test MAPE (Original Scale): {test_mape_original_lr:.4f}")
 print(f"Decision Tree Test MAPE (Original Scale): {test_mape_original_dt:.4f}")
@@ -300,10 +284,20 @@ print(f"XGBoost Test MAPE (Original Scale): {test_mape_original_xgb:.4f}")
 print(f"LSTM Test MAPE: {test_mape_lstm:.4f}")
 print(f"GRU Test MAPE: {test_mape_gru:.4f}")
 
+to_save += (f"\nModel Performance Comparison:\n")
+to_save +=(f"Linear Regression Test MAPE (Original Scale): {test_mape_original_lr:.4f}\n")
+to_save +=(f"Decision Tree Test MAPE (Original Scale): {test_mape_original_dt:.4f}\n")
+to_save +=(f"XGBoost Test MAPE (Original Scale): {test_mape_original_xgb:.4f}\n")
+to_save +=(f"LSTM Test MAPE: {test_mape_lstm:.4f}\n")
+to_save +=(f"GRU Test MAPE: {test_mape_gru:.4f}\n")
+with open('./perf.txt', 'a') as f:
+    f.write(to_save)
 
 
-# Let's assume XGBoost is the best model
-best_model = lr_model
+best_model = grid_search_xgb
+X = pd.concat([X_train], ignore_index=True)
+y = pd.concat([y_train], ignore_index=True)
+best_model.fit(X_train, y_train)
 y_test_pred_scaled = best_model.predict(X_test_scaled)
 y_test_pred = scaler_y.inverse_transform(y_test_pred_scaled.reshape(-1, 1)).flatten()
 y_test_actual = y_test.values.flatten()
@@ -317,7 +311,6 @@ returns = signals * (y_test_actual - X_test['Close']) / X_test['Close']
 # Cumulative returns
 cumulative_returns = np.cumprod(1 + returns) - 1
 
-print(f'Total Test Return: {cumulative_returns}')
 
 
 # Calculate Sharpe Ratio
@@ -331,6 +324,7 @@ roll_max = np.maximum.accumulate(cum_returns)
 drawdown = (cum_returns - roll_max) / roll_max
 max_drawdown = drawdown.min()
 
+print(f'Total Test Return: {cumulative_returns.iloc[-1]}')
 print(f'Sharpe Ratio on Test Set: {sharpe_ratio:.4f}')
 print(f'Maximum Drawdown on Test Set: {max_drawdown:.4f}')
 

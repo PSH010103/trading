@@ -56,9 +56,6 @@ def json_to_dataframe(json_data, series_names):
     return combined_df
 
 
-# Example usage
-api_key = "7424f795f85a4eb1a4d79252176bf376"
-
 
 # Manual dictionary for series names
 series_names = {

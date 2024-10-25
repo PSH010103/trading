@@ -1,3 +1,3 @@
-# FMP_API_KEY = ''
+FMP_API_KEY = ''
 FRED_API_KEY = ''
 BLS_API_KEY = ''
